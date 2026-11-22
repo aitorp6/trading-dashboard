@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trading Performance Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg: '#090d16',
+            card: '#111827',
+            cardBorder: '#1f2937',
+            accent: '#38bdf8',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      background-color: #090d16;
+      color: #e5e7eb;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .glass-card {
+      background: linear-gradient(180deg, rgba(17, 24, 39, 0.96) 0%, rgba(13, 19, 31, 0.98) 100%);
+      border: 1px solid rgba(55, 65, 81, 0.55);
+      box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.55);
+    }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .sort-btn { cursor: pointer; user-select: none; }
+    .sort-btn:hover { color: #38bdf8; }
+  </style>
+</head>
+<body class="min-h-screen antialiased selection:bg-sky-500/30 selection:text-sky-200">
+  <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Header -->
+    <header class="glass-card rounded-2xl p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div class="space-y-1.5">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div class="h-9 w-9 rounded-xl bg-sky-500/15 border border-sky-400/30 flex items-center justify-center text-sky-400">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 17l6-6 4 4 8-8m0 0h-5m5 0v5" />
+            </svg>
+          </div>
+          <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-white">Trading Performance Dashboard</h1>
+          <span id="badge-account-label" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-300 border border-sky-400/30"></span>
+          <span id="badge-account-type" class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-400/30"></span>
+        </div>
+        <p class="text-sm text-slate-400">
+          Registro auditado de ejecuciones en NinjaTrader 8 · Desde <span id="meta-from-date" class="text-slate-200 font-medium"></span>
+          · Última actualización: <span id="meta-updated" class="text-slate-200 font-medium"></span>
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="px-3.5 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs">
+          <span class="text-slate-400 block">Trades visibles</span>
+          <span id="header-visible-trades" class="text-base font-bold text-white tabular-nums">0</span>
+        </div>
+        <div class="px-3.5 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs">
+          <span class="text-slate-400 block">Racha actual</span>
+          <span id="header-streak" class="text-base font-bold tabular-nums">-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Warnings if any -->
+    <div id="warnings-box" class="hidden rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"></div>
+
+    <!-- Interactive Filter Bar -->
+    <section class="glass-card rounded-2xl p-4 sm:p-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+        <div>
+          <label for="filter-symbol" class="block text-xs font-medium text-slate-400 mb-1">Instrumento</label>
+          <select id="filter-symbol" class="w-full rounded-xl bg-slate-900 border border-slate-700/80 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400">
+            <option value="ALL">Todos los activos</option>
+          </select>
+        </div>
+        <div>
+          <label for="filter-side" class="block text-xs font-medium text-slate-400 mb-1">Dirección</label>
+          <select id="filter-side" class="w-full rounded-xl bg-slate-900 border border-slate-700/80 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400">
+            <option value="ALL">Long y Short</option>
+            <option value="Long">Solo Long</option>
+            <option value="Short">Solo Short</option>
+          </select>
+        </div>
+        <div>
+          <label for="filter-strategy" class="block text-xs font-medium text-slate-400 mb-1">Señal / Entrada</label>
+          <select id="filter-strategy" class="w-full rounded-xl bg-slate-900 border border-slate-700/80 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400">
+            <option value="ALL">Todas las señales</option>
+          </select>
+        </div>
+        <div>
+          <label for="filter-from" class="block text-xs font-medium text-slate-400 mb-1">Desde fecha</label>
+          <input id="filter-from" type="date" class="w-full rounded-xl bg-slate-900 border border-slate-700/80 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400" />
+        </div>
+        <div>
+          <label for="filter-to" class="block text-xs font-medium text-slate-400 mb-1">Hasta fecha</label>
+          <input id="filter-to" type="date" class="w-full rounded-xl bg-slate-900 border border-slate-700/80 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400" />
+        </div>
+        <div class="flex gap-2">
+          <button id="btn-reset-filters" type="button" class="w-full rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition">
+            Reset filtros
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Primary KPI Cards -->
+    <section id="kpi-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3.5"></section>
+
+    <!-- Main Charts: Equity + Drawdown -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div class="glass-card rounded-2xl p-5 lg:col-span-2 flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-base font-semibold text-white">Curva de Equity Acumulada &amp; High-Water Mark</h2>
+            <p class="text-xs text-slate-400">Evolución del resultado neto operación a operación</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <div class="inline-flex rounded-lg bg-slate-900 p-0.5 border border-slate-800">
+              <button data-eq-unit="usd" class="eq-unit-btn px-2.5 py-1 rounded-md font-medium bg-sky-500/20 text-sky-300">Dólares ($)</button>
+              <button data-eq-unit="pts" class="eq-unit-btn px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-slate-200">Puntos</button>
+            </div>
+            <div class="inline-flex rounded-lg bg-slate-900 p-0.5 border border-slate-800">
+              <button data-eq-x="trade" class="eq-x-btn px-2.5 py-1 rounded-md font-medium bg-sky-500/20 text-sky-300">Por Trade</button>
+              <button data-eq-x="time" class="eq-x-btn px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-slate-200">Temporal</button>
+            </div>
+          </div>
+        </div>
+        <div class="relative h-72 sm:h-80 w-full">
+          <canvas id="chart-equity"></canvas>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 flex flex-col">
+        <div class="mb-4">
+          <h2 class="text-base font-semibold text-white">Drawdown Underwater ($)</h2>
+          <p class="text-xs text-slate-400">Caída desde máximo histórico de equity</p>
+        </div>
+        <div class="relative h-72 sm:h-80 w-full">
+          <canvas id="chart-drawdown"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Period PnL + Breakdown by Instrument & Side -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div class="glass-card rounded-2xl p-5 flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-base font-semibold text-white">PnL Agrupado por Periodo</h2>
+            <p class="text-xs text-slate-400">Rendimiento neto en dólares ($) según ventana temporal</p>
+          </div>
+          <div class="inline-flex rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-xs">
+            <button data-period="day" class="period-btn px-2.5 py-1 rounded-md font-medium bg-sky-500/20 text-sky-300">Día</button>
+            <button data-period="week" class="period-btn px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-slate-200">Semana</button>
+            <button data-period="month" class="period-btn px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-slate-200">Mes</button>
+          </div>
+        </div>
+        <div class="relative h-64 w-full">
+          <canvas id="chart-period"></canvas>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 flex flex-col">
+        <div class="mb-4">
+          <h2 class="text-base font-semibold text-white">Desglose por Instrumento y Dirección</h2>
+          <p class="text-xs text-slate-400">PnL Neto ($) Long vs Short por activo operado</p>
+        </div>
+        <div class="relative h-56 w-full mb-3">
+          <canvas id="chart-instrument"></canvas>
+        </div>
+        <div id="instrument-badges" class="flex flex-wrap gap-2 text-xs"></div>
+      </div>
+    </section>
+
+    <!-- MAE vs MFE Scatter + Trade PnL Distribution -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div class="glass-card rounded-2xl p-5 flex flex-col">
+        <div class="mb-4">
+          <h2 class="text-base font-semibold text-white">Excursión Adversa (MAE) vs Favorable (MFE)</h2>
+          <p class="text-xs text-slate-400">Evaluación en puntos de riesgo asumido frente a recorrido máximo</p>
+        </div>
+        <div class="relative h-64 w-full">
+          <canvas id="chart-mae-mfe"></canvas>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 flex flex-col">
+        <div class="mb-4">
+          <h2 class="text-base font-semibold text-white">Resultado por Operación ($)</h2>
+          <p class="text-xs text-slate-400">Distribución cronológica de ganancias y pérdidas por trade</p>
+        </div>
+        <div class="relative h-64 w-full">
+          <canvas id="chart-trade-pnl"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Temporal Analysis: Hour + Weekday -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div class="glass-card rounded-2xl p-5 flex flex-col">
+        <div class="mb-4">
+          <h2 class="text-base font-semibold text-white">PnL por Hora de Entrada</h2>
+          <p class="text-xs text-slate-400">Rendimiento acumulado según la hora de apertura</p>
+        </div>
+        <div class="relative h-60 w-full">
+          <canvas id="chart-hour"></canvas>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 flex flex-col">
+        <div class="mb-4">
+          <h2 class="text-base font-semibold text-white">PnL por Día de la Semana</h2>
+          <p class="text-xs text-slate-400">Rendimiento acumulado de lunes a domingo</p>
+        </div>
+        <div class="relative h-60 w-full">
+          <canvas id="chart-weekday"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Advanced Metrics & Monthly Calendar Heatmap -->
+    <section class="grid grid-cols-1 xl:grid-cols-12 gap-5">
+      <!-- Detailed Stats Table -->
+      <div class="glass-card rounded-2xl p-5 xl:col-span-5 space-y-5">
+        <div>
+          <h2 class="text-base font-semibold text-white">Métricas Avanzadas de Rendimiento</h2>
+          <p class="text-xs text-slate-400">Estadísticas detalladas sobre las operaciones seleccionadas</p>
+        </div>
+        <div id="advanced-stats-body" class="space-y-4"></div>
+      </div>
+
+      <!-- Monthly Heatmap Calendar -->
+      <div class="glass-card rounded-2xl p-5 xl:col-span-7 flex flex-col space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-semibold text-white">Calendario Mensual de Trading</h2>
+            <p id="calendar-summary" class="text-xs text-slate-400">Resumen diario de PnL</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="cal-prev" type="button" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200">&larr; Anterior</button>
+            <span id="cal-month-title" class="min-w-[140px] text-center text-sm font-semibold text-white capitalize"></span>
+            <button id="cal-next" type="button" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200">Siguiente &rarr;</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-7 gap-1.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+          <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+        </div>
+        <div id="calendar-grid" class="grid grid-cols-7 gap-1.5 flex-1"></div>
+      </div>
+    </section>
+
+    <!-- Full Trades Table -->
+    <section class="glass-card rounded-2xl p-5 space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 class="text-base font-semibold text-white">Historial Completo de Operaciones</h2>
+          <p class="text-xs text-slate-400">Haz clic en cualquier columna para ordenar</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <input id="table-search" type="search" placeholder="Buscar instrumento, señal, fecha..." class="rounded-xl bg-slate-900 border border-slate-700/80 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-400 w-64" />
+          <button id="btn-export-csv" type="button" class="inline-flex items-center gap-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 px-3.5 py-1.5 text-sm font-medium text-sky-300 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3" />
+            </svg>
+            Exportar CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto rounded-xl border border-slate-800/80">
+        <table class="min-w-full divide-y divide-slate-800 text-xs sm:text-sm">
+          <thead class="bg-slate-900/90 text-slate-400 text-xs uppercase tracking-wider">
+            <tr>
+              <th class="px-3 py-3 text-left sort-btn" data-sort="id">#</th>
+              <th class="px-3 py-3 text-left sort-btn" data-sort="instrument">Instrumento</th>
+              <th class="px-3 py-3 text-left sort-btn" data-sort="side">Lado</th>
+              <th class="px-3 py-3 text-right sort-btn" data-sort="qty">Qty</th>
+              <th class="px-3 py-3 text-left sort-btn" data-sort="entryTime">Entrada</th>
+              <th class="px-3 py-3 text-left sort-btn" data-sort="exitTime">Salida</th>
+              <th class="px-3 py-3 text-right sort-btn" data-sort="durationMin">Duración</th>
+              <th class="px-3 py-3 text-right sort-btn" data-sort="entryPrice">P. Ent</th>
+              <th class="px-3 py-3 text-right sort-btn" data-sort="exitPrice">P. Sal</th>
+              <th class="px-3 py-3 text-right sort-btn" data-sort="pnlPoints">Puntos</th>
+              <th class="px-3 py-3 text-right sort-btn" data-sort="mae">MAE</th>
+              <th class="px-3 py-3 text-right sort-btn" data-sort="mfe">MFE</th>
+              <th class="px-3 py-3 text-right sort-btn" data-sort="pnl">PnL ($)</th>
+              <th class="px-3 py-3 text-right sort-btn" data-sort="equity">Equity ($)</th>
+              <th class="px-3 py-3 text-left sort-btn" data-sort="entryName">Señal / Salida</th>
+            </tr>
+          </thead>
+          <tbody id="trades-tbody" class="divide-y divide-slate-800/70 bg-slate-950/40 tabular-nums"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="text-center text-xs text-slate-500 pb-4">
+      Dashboard estático generado automáticamente · Datos sincronizados desde NinjaTrader 8
+    </footer>
+  </div>
+
+  <!-- Embedded Dataset -->
+  <script id="trading-data" type="application/json">{"accountHash": "f2c9c2356bca", "accountLabel": "Cuenta Simulación", "accountType": "Simulación", "fromDate": "2026-11-15", "generatedAt": "2026-11-22 19:36:20", "source": "db", "warnings": [], "trades": [{"instrument": "M2K DEC26", "symbol": "M2K", "side": "Short", "qty": 1, "entryName": "M2K_Short", "exitName": "Stop loss", "entryTime": "2026-11-17T10:45:00", "exitTime": "2026-11-17T11:00:38", "durationMin": 15.63, "entryPrice": 2715.8, "exitPrice": 2714.3, "pnl": 7.5, "pnlPoints": 1.5, "mae": 0.5, "mfe": 16.3, "bars": 1, "commission": 0.0, "fee": 0.0, "id": 1}, {"instrument": "MNQ DEC26", "symbol": "MNQ", "side": "Short", "qty": 1, "entryName": "Sell short", "exitName": "Profit target", "entryTime": "2026-11-19T10:20:00", "exitTime": "2026-11-19T12:03:00", "durationMin": 103.0, "entryPrice": 27456.75, "exitPrice": 26831.75, "pnl": 1250.0, "pnlPoints": 625.0, "mae": 15.25, "mfe": 626.25, "bars": 5, "commission": 0.0, "fee": 0.0, "id": 2}, {"instrument": "MNQ DEC26", "symbol": "MNQ", "side": "Short", "qty": 1, "entryName": "Sell short", "exitName": "Synchronize", "entryTime": "2026-11-20T10:45:00", "exitTime": "2026-11-20T11:36:47", "durationMin": 51.78, "entryPrice": 25915.5, "exitPrice": 25753.0, "pnl": 325.0, "pnlPoints": 162.5, "mae": 68.0, "mfe": 312.75, "bars": null, "commission": 0.0, "fee": 0.0, "id": 3}, {"instrument": "MNQ DEC26", "symbol": "MNQ", "side": "Short", "qty": 1, "entryName": "M2K_Short", "exitName": "Profit target", "entryTime": "2026-11-20T10:45:00", "exitTime": "2026-11-20T12:02:00", "durationMin": 77.0, "entryPrice": 25915.5, "exitPrice": 25603.0, "pnl": 625.0, "pnlPoints": 312.5, "mae": 68.0, "mfe": 312.75, "bars": 5, "commission": 0.0, "fee": 0.0, "id": 4}, {"instrument": "MNQ DEC26", "symbol": "MNQ", "side": "Long", "qty": 1, "entryName": "Profit target", "exitName": "Close", "entryTime": "2026-11-20T12:02:00", "exitTime": "2026-11-20T14:35:43", "durationMin": 153.72, "entryPrice": 25603.0, "exitPrice": 25325.75, "pnl": -554.5, "pnlPoints": -277.25, "mae": 362.75, "mfe": 159.75, "bars": null, "commission": 0.0, "fee": 0.0, "id": 5}]}</script>
+
+  <script>
+    (() => {
+      const payload = JSON.parse(document.getElementById('trading-data').textContent);
+      const allTrades = (payload.trades || []).slice().sort((a, b) =>
+        (a.exitTime || '').localeCompare(b.exitTime || '') || (a.entryTime || '').localeCompare(b.entryTime || '')
+      );
+
+      const state = {
+        symbol: 'ALL',
+        side: 'ALL',
+        strategy: 'ALL',
+        fromDate: '',
+        toDate: '',
+        search: '',
+        eqUnit: 'usd',
+        eqX: 'trade',
+        period: 'day',
+        sortKey: 'id',
+        sortDir: 'desc',
+        calYear: null,
+        calMonth: null,
+      };
+
+      const charts = {};
+
+      // Formatting helpers
+      const fmtUSD = (val) => {
+        const num = Number(val) || 0;
+        const sign = num > 0 ? '+' : num < 0 ? '-' : '';
+        return `${sign}$${Math.abs(num).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      };
+      const fmtUSDPlain = (val) => {
+        const num = Number(val) || 0;
+        return `$${num.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      };
+      const fmtNum = (val, dec = 2) => (Number(val) || 0).toLocaleString('es-ES', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+      const fmtPts = (val) => {
+        const num = Number(val) || 0;
+        const sign = num > 0 ? '+' : '';
+        return `${sign}${fmtNum(num, 2)} pts`;
+      };
+      const fmtDateTime = (iso) => {
+        if (!iso) return '-';
+        return iso.replace('T', ' ').slice(0, 19);
+      };
+      const fmtDuration = (min) => {
+        const m = Number(min) || 0;
+        if (m < 1) return `${Math.round(m * 60)}s`;
+        if (m < 60) return `${Math.round(m)}m`;
+        const h = Math.floor(m / 60);
+        const rem = Math.round(m % 60);
+        return `${h}h ${rem}m`;
+      };
+      const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[c]);
+
+      function getFilteredTrades() {
+        return allTrades.filter((t) => {
+          if (state.symbol !== 'ALL' && t.symbol !== state.symbol) return false;
+          if (state.side !== 'ALL' && t.side !== state.side) return false;
+          if (state.strategy !== 'ALL' && t.entryName !== state.strategy) return false;
+          const exitDate = (t.exitTime || '').slice(0, 10);
+          if (state.fromDate && exitDate < state.fromDate) return false;
+          if (state.toDate && exitDate > state.toDate) return false;
+          return true;
+        });
+      }
+
+      function getISOWeekKey(dateStr) {
+        const d = new Date(`${dateStr}T00:00:00`);
+        const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        const dayNum = tmp.getUTCDay() || 7;
+        tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+        const weekNo = Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
+        return `${tmp.getUTCFullYear()}-S${String(weekNo).padStart(2, '0')}`;
+      }
+
+      function computeStats(trades) {
+        const n = trades.length;
+        let eqUsd = 0;
+        let eqPts = 0;
+        let peakUsd = 0;
+        let maxDdUsd = 0;
+        let maxDdPct = 0;
+        let grossProfit = 0;
+        let grossLoss = 0;
+        let winners = 0;
+        let losers = 0;
+        let flat = 0;
+        let sumWin = 0;
+        let sumLoss = 0;
+        let best = null;
+        let worst = null;
+        let curWinStreak = 0;
+        let curLossStreak = 0;
+        let maxWinStreak = 0;
+        let maxLossStreak = 0;
+        let sumDuration = 0;
+        let sumWinDur = 0;
+        let sumLossDur = 0;
+        let sumMae = 0;
+        let sumMfe = 0;
+        let sumComm = 0;
+        let captureSum = 0;
+        let captureCount = 0;
+
+        const equitySeries = [];
+        const ddSeries = [];
+        const dailyMap = new Map();
+
+        trades.forEach((t, idx) => {
+          const pnl = Number(t.pnl) || 0;
+          const pts = Number(t.pnlPoints) || 0;
+          const dur = Number(t.durationMin) || 0;
+          const mae = Number(t.mae) || 0;
+          const mfe = Number(t.mfe) || 0;
+          const comm = (Number(t.commission) || 0) + (Number(t.fee) || 0);
+
+          eqUsd += pnl;
+          eqPts += pts;
+          if (eqUsd > peakUsd) peakUsd = eqUsd;
+          const dd = eqUsd - peakUsd;
+          if (dd < maxDdUsd) {
+            maxDdUsd = dd;
+            if (peakUsd > 0) {
+              maxDdPct = Math.max(maxDdPct, (Math.abs(dd) / peakUsd) * 100);
+            }
+          }
+
+          equitySeries.push({
+            idx: idx + 1,
+            time: t.exitTime,
+            eqUsd,
+            eqPts,
+            peakUsd,
+            peakPts: equitySeries.length ? Math.max(...equitySeries.map(p => p.peakPts), eqPts) : Math.max(0, eqPts),
+            pnl,
+            instrument: t.instrument,
+          });
+          ddSeries.push({ idx: idx + 1, time: t.exitTime, dd });
+
+          const dayKey = (t.exitTime || '').slice(0, 10);
+          if (dayKey) dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + pnl);
+
+          if (pnl > 0) {
+            winners++;
+            grossProfit += pnl;
+            sumWin += pnl;
+            sumWinDur += dur;
+            curWinStreak++;
+            curLossStreak = 0;
+            maxWinStreak = Math.max(maxWinStreak, curWinStreak);
+          } else if (pnl < 0) {
+            losers++;
+            grossLoss += pnl;
+            sumLoss += pnl;
+            sumLossDur += dur;
+            curLossStreak++;
+            curWinStreak = 0;
+            maxLossStreak = Math.max(maxLossStreak, curLossStreak);
+          } else {
+            flat++;
+            curWinStreak = 0;
+            curLossStreak = 0;
+          }
+
+          if (best === null || pnl > best) best = pnl;
+          if (worst === null || pnl < worst) worst = pnl;
+
+          sumDuration += dur;
+          sumMae += mae;
+          sumMfe += mfe;
+          sumComm += comm;
+          if (mfe > 0) {
+            captureSum += pts / mfe;
+            captureCount++;
+          }
+        });
+
+        // Recompute peakPts properly
+        let runningPeakPts = 0;
+        equitySeries.forEach((pt) => {
+          if (pt.eqPts > runningPeakPts) runningPeakPts = pt.eqPts;
+          pt.peakPts = runningPeakPts;
+        });
+
+        const netProfit = eqUsd;
+        const winRate = n > 0 ? (winners / n) * 100 : 0;
+        const profitFactor = grossLoss < 0 ? grossProfit / Math.abs(grossLoss) : (grossProfit > 0 ? Infinity : 0);
+        const avgTrade = n > 0 ? netProfit / n : 0;
+        const avgPts = n > 0 ? eqPts / n : 0;
+        const avgWin = winners > 0 ? sumWin / winners : 0;
+        const avgLoss = losers > 0 ? sumLoss / losers : 0;
+        const payoff = avgLoss < 0 ? avgWin / Math.abs(avgLoss) : (avgWin > 0 ? Infinity : 0);
+        const maxDdAbs = Math.abs(maxDdUsd);
+        const recoveryFactor = maxDdAbs > 0 ? netProfit / maxDdAbs : (netProfit > 0 ? Infinity : 0);
+
+        // Sharpe & Sortino based on daily returns when >= 2 days, else per-trade
+        const seriesForRatio = dailyMap.size >= 2 ? Array.from(dailyMap.values()) : trades.map(t => Number(t.pnl) || 0);
+        const annualFactor = dailyMap.size >= 2 ? Math.sqrt(252) : Math.sqrt(Math.max(1, n));
+        let sharpe = 0;
+        let sortino = 0;
+        if (seriesForRatio.length >= 2) {
+          const mean = seriesForRatio.reduce((a, b) => a + b, 0) / seriesForRatio.length;
+          const variance = seriesForRatio.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (seriesForRatio.length - 1);
+          const std = Math.sqrt(variance);
+          if (std > 0) sharpe = (mean / std) * annualFactor;
+
+          const downsideSq = seriesForRatio.map(v => (v < 0 ? v * v : 0)).reduce((a, b) => a + b, 0) / seriesForRatio.length;
+          const downDev = Math.sqrt(downsideSq);
+          if (downDev > 0) sortino = (mean / downDev) * annualFactor;
+          else if (mean > 0) sortino = Infinity;
+        }
+
+        const currentStreak = curWinStreak > 0
+          ? { type: 'W', count: curWinStreak }
+          : (curLossStreak > 0 ? { type: 'L', count: curLossStreak } : { type: '-', count: 0 });
+
+        const sideStats = (sideName) => {
+          const sub = trades.filter(t => t.side === sideName);
+          const sw = sub.filter(t => t.pnl > 0).length;
+          const net = sub.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+          const gp = sub.filter(t => t.pnl > 0).reduce((s, t) => s + t.pnl, 0);
+          const gl = sub.filter(t => t.pnl < 0).reduce((s, t) => s + t.pnl, 0);
+          return {
+            count: sub.length,
+            winRate: sub.length ? (sw / sub.length) * 100 : 0,
+            net,
+            pf: gl < 0 ? gp / Math.abs(gl) : (gp > 0 ? Infinity : 0),
+            avg: sub.length ? net / sub.length : 0,
+          };
+        };
+
+        return {
+          n, winners, losers, flat,
+          netProfit, netPts: eqPts,
+          grossProfit, grossLoss, sumComm,
+          winRate, profitFactor, avgTrade, avgPts,
+          avgWin, avgLoss, payoff,
+          best: best ?? 0, worst: worst ?? 0,
+          maxDdAbs, maxDdPct, recoveryFactor,
+          sharpe, sortino,
+          maxWinStreak, maxLossStreak, currentStreak,
+          avgDuration: n > 0 ? sumDuration / n : 0,
+          avgWinDur: winners > 0 ? sumWinDur / winners : 0,
+          avgLossDur: losers > 0 ? sumLossDur / losers : 0,
+          avgMae: n > 0 ? sumMae / n : 0,
+          avgMfe: n > 0 ? sumMfe / n : 0,
+          captureEff: captureCount > 0 ? (captureSum / captureCount) * 100 : 0,
+          longStats: sideStats('Long'),
+          shortStats: sideStats('Short'),
+          equitySeries,
+          ddSeries,
+          dailyMap,
+        };
+      }
+
+      function renderHeaderAndFiltersMeta(trades, stats) {
+        document.getElementById('badge-account-label').textContent = payload.accountLabel || 'Cuenta';
+        document.getElementById('badge-account-type').textContent = payload.accountType || 'Simulación';
+        document.getElementById('meta-from-date').textContent = payload.fromDate || '-';
+        document.getElementById('meta-updated').textContent = payload.generatedAt || '-';
+        document.getElementById('header-visible-trades').textContent = `${trades.length} / ${allTrades.length}`;
+
+        const streakEl = document.getElementById('header-streak');
+        if (stats.currentStreak.type === 'W') {
+          streakEl.textContent = `+${stats.currentStreak.count} Ganadoras`;
+          streakEl.className = 'text-base font-bold tabular-nums text-emerald-400';
+        } else if (stats.currentStreak.type === 'L') {
+          streakEl.textContent = `-${stats.currentStreak.count} Perdedoras`;
+          streakEl.className = 'text-base font-bold tabular-nums text-rose-400';
+        } else {
+          streakEl.textContent = 'Sin racha';
+          streakEl.className = 'text-base font-bold tabular-nums text-slate-300';
+        }
+
+        const warnBox = document.getElementById('warnings-box');
+        if (payload.warnings && payload.warnings.length) {
+          warnBox.classList.remove('hidden');
+          warnBox.innerHTML = payload.warnings.map(w => `<div>⚠️ ${escapeHtml(w)}</div>`).join('');
+        } else {
+          warnBox.classList.add('hidden');
+        }
+      }
+
+      function renderKPIs(stats) {
+        const formatRatio = (v) => (v === Infinity ? '∞' : fmtNum(v, 2));
+        const cards = [
+          {
+            label: 'Net Profit',
+            value: fmtUSD(stats.netProfit),
+            sub: fmtPts(stats.netPts),
+            color: stats.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400',
+          },
+          {
+            label: 'Win Rate',
+            value: `${fmtNum(stats.winRate, 1)}%`,
+            sub: `${stats.winners}G / ${stats.losers}P`,
+            color: stats.winRate >= 50 ? 'text-emerald-400' : 'text-amber-300',
+          },
+          {
+            label: 'Profit Factor',
+            value: formatRatio(stats.profitFactor),
+            sub: `Payoff ${formatRatio(stats.payoff)}x`,
+            color: stats.profitFactor >= 1.5 ? 'text-emerald-400' : (stats.profitFactor >= 1 ? 'text-sky-300' : 'text-rose-400'),
+          },
+          {
+            label: 'Esperanza / Trade',
+            value: fmtUSD(stats.avgTrade),
+            sub: fmtPts(stats.avgPts),
+            color: stats.avgTrade >= 0 ? 'text-emerald-400' : 'text-rose-400',
+          },
+          {
+            label: 'Max Drawdown',
+            value: stats.maxDdAbs > 0 ? `-${fmtUSDPlain(stats.maxDdAbs)}` : '$0,00',
+            sub: stats.maxDdPct > 0 ? `-${fmtNum(stats.maxDdPct, 1)}% sobre pico` : 'Sin drawdown',
+            color: stats.maxDdAbs > 0 ? 'text-rose-400' : 'text-slate-200',
+          },
+          {
+            label: 'Ratio Sharpe',
+            value: fmtNum(stats.sharpe, 2),
+            sub: `Sortino ${formatRatio(stats.sortino)}`,
+            color: stats.sharpe >= 1.5 ? 'text-emerald-400' : 'text-sky-300',
+          },
+          {
+            label: 'Recovery Factor',
+            value: formatRatio(stats.recoveryFactor),
+            sub: `Neto / Max DD`,
+            color: stats.recoveryFactor >= 2 ? 'text-emerald-400' : 'text-slate-200',
+          },
+          {
+            label: 'Media Gan. / Perd.',
+            value: fmtUSD(stats.avgWin),
+            sub: `Pérd: ${fmtUSD(stats.avgLoss)}`,
+            color: 'text-slate-100',
+          },
+        ];
+
+        document.getElementById('kpi-grid').innerHTML = cards.map(c => `
+          <div class="glass-card rounded-2xl p-4 flex flex-col justify-between">
+            <span class="text-xs font-medium text-slate-400">${c.label}</span>
+            <span class="text-lg sm:text-xl font-bold mt-1 tabular-nums ${c.color}">${c.value}</span>
+            <span class="text-[11px] text-slate-400 mt-1 tabular-nums">${c.sub}</span>
+          </div>
+        `).join('');
+      }
+
+      function renderAdvancedStats(stats) {
+        const formatRatio = (v) => (v === Infinity ? '∞' : fmtNum(v, 2));
+        const rowsA = [
+          ['Gross Profit', fmtUSD(stats.grossProfit), 'text-emerald-400'],
+          ['Gross Loss', fmtUSD(stats.grossLoss), 'text-rose-400'],
+          ['Comisiones y Fees', fmtUSDPlain(stats.sumComm), 'text-slate-200'],
+          ['Mejor Trade', fmtUSD(stats.best), 'text-emerald-400'],
+          ['Peor Trade', fmtUSD(stats.worst), 'text-rose-400'],
+          ['Racha Máx. Ganadora', `${stats.maxWinStreak} trades`, 'text-emerald-400'],
+          ['Racha Máx. Perdedora', `${stats.maxLossStreak} trades`, 'text-rose-400'],
+          ['Duración Media (Global)', fmtDuration(stats.avgDuration), 'text-slate-200'],
+          ['Duración Media (Gan / Perd)', `${fmtDuration(stats.avgWinDur)} / ${fmtDuration(stats.avgLossDur)}`, 'text-slate-200'],
+          ['MAE Medio / MFE Medio', `${fmtNum(stats.avgMae, 2)} / ${fmtNum(stats.avgMfe, 2)} pts`, 'text-sky-300'],
+          ['Eficiencia Captura MFE', `${fmtNum(stats.captureEff, 1)}%`, 'text-sky-300'],
+        ];
+
+        const sideBlock = (title, s, badgeCls) => `
+          <div class="rounded-xl bg-slate-900/70 border border-slate-800 p-3.5 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded-md text-xs font-semibold ${badgeCls}">${title}</span>
+              <span class="text-xs text-slate-400 tabular-nums">${s.count} trades</span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-base font-bold tabular-nums ${s.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${fmtUSD(s.net)}</span>
+              <span class="text-xs text-slate-300 tabular-nums">WR ${fmtNum(s.winRate, 1)}% · PF ${formatRatio(s.pf)}</span>
+            </div>
+            <div class="text-[11px] text-slate-400 tabular-nums">Media: ${fmtUSD(s.avg)} / trade</div>
+          </div>
+        `;
+
+        document.getElementById('advanced-stats-body').innerHTML = `
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            ${sideBlock('LONG', stats.longStats, 'bg-emerald-500/15 text-emerald-300')}
+            ${sideBlock('SHORT', stats.shortStats, 'bg-rose-500/15 text-rose-300')}
+          </div>
+          <div class="divide-y divide-slate-800/80 text-sm">
+            ${rowsA.map(([k, v, cls]) => `
+              <div class="py-2 flex items-center justify-between gap-2">
+                <span class="text-slate-400">${k}</span>
+                <span class="font-semibold tabular-nums ${cls}">${v}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      function upsertChart(id, config) {
+        if (charts[id]) {
+          charts[id].destroy();
+        }
+        const ctx = document.getElementById(id).getContext('2d');
+        charts[id] = new Chart(ctx, config);
+      }
+
+      const commonGrid = {
+        color: 'rgba(148, 163, 184, 0.1)',
+        drawBorder: false,
+      };
+      const commonTicks = {
+        color: '#94a3b8',
+        font: { size: 11 },
+      };
+
+      function renderCharts(trades, stats) {
+        // 1. Equity + High-Water Mark
+        const eqLabels = stats.equitySeries.map((p) =>
+          state.eqX === 'trade' ? `#${p.idx}` : fmtDateTime(p.time).slice(5, 16)
+        );
+        const eqData = stats.equitySeries.map((p) => (state.eqUnit === 'usd' ? p.eqUsd : p.eqPts));
+        const hwmData = stats.equitySeries.map((p) => (state.eqUnit === 'usd' ? p.peakUsd : p.peakPts));
+
+        upsertChart('chart-equity', {
+          type: 'line',
+          data: {
+            labels: eqLabels,
+            datasets: [
+              {
+                label: state.eqUnit === 'usd' ? 'Equity ($)' : 'Equity (Puntos)',
+                data: eqData,
+                borderColor: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                borderWidth: 2.5,
+                fill: true,
+                tension: 0.2,
+                pointRadius: 3.5,
+                pointHoverRadius: 6,
+                pointBackgroundColor: stats.equitySeries.map(p => (p.pnl >= 0 ? '#10b981' : '#f43f5e')),
+              },
+              {
+                label: 'High-Water Mark',
+                data: hwmData,
+                borderColor: 'rgba(16, 185, 129, 0.6)',
+                borderWidth: 1.5,
+                borderDash: [5, 4],
+                fill: false,
+                pointRadius: 0,
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { labels: { color: '#cbd5e1', font: { size: 11 } } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => `${ctx.dataset.label}: ${state.eqUnit === 'usd' ? fmtUSD(ctx.parsed.y) : fmtPts(ctx.parsed.y)}`
+                }
+              }
+            },
+            scales: {
+              x: { grid: commonGrid, ticks: commonTicks },
+              y: {
+                grid: commonGrid,
+                ticks: {
+                  ...commonTicks,
+                  callback: (v) => (state.eqUnit === 'usd' ? `$${v}` : `${v}p`)
+                }
+              }
+            }
+          }
+        });
+
+        // 2. Drawdown Underwater
+        upsertChart('chart-drawdown', {
+          type: 'line',
+          data: {
+            labels: stats.ddSeries.map(p => `#${p.idx}`),
+            datasets: [{
+              label: 'Drawdown ($)',
+              data: stats.ddSeries.map(p => p.dd),
+              borderColor: '#f43f5e',
+              backgroundColor: 'rgba(244, 63, 94, 0.2)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.15,
+              pointRadius: 3,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => `Drawdown: ${fmtUSD(ctx.parsed.y)}` } }
+            },
+            scales: {
+              x: { grid: commonGrid, ticks: commonTicks },
+              y: {
+                suggestedMax: 0,
+                grid: commonGrid,
+                ticks: { ...commonTicks, callback: (v) => `$${v}` }
+              }
+            }
+          }
+        });
+
+        // 3. PnL grouped by Period
+        const periodMap = new Map();
+        trades.forEach((t) => {
+          const d = (t.exitTime || '').slice(0, 10);
+          if (!d) return;
+          let key = d;
+          if (state.period === 'week') key = getISOWeekKey(d);
+          else if (state.period === 'month') key = d.slice(0, 7);
+          periodMap.set(key, (periodMap.get(key) || 0) + (Number(t.pnl) || 0));
+        });
+        const pLabels = Array.from(periodMap.keys());
+        const pVals = Array.from(periodMap.values());
+
+        upsertChart('chart-period', {
+          type: 'bar',
+          data: {
+            labels: pLabels,
+            datasets: [{
+              label: 'PnL ($)',
+              data: pVals,
+              backgroundColor: pVals.map(v => (v >= 0 ? 'rgba(16, 185, 129, 0.78)' : 'rgba(244, 63, 94, 0.78)')),
+              borderColor: pVals.map(v => (v >= 0 ? '#10b981' : '#f43f5e')),
+              borderWidth: 1,
+              borderRadius: 6,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => `PnL: ${fmtUSD(ctx.parsed.y)}` } }
+            },
+            scales: {
+              x: { grid: commonGrid, ticks: commonTicks },
+              y: { grid: commonGrid, ticks: { ...commonTicks, callback: (v) => `$${v}` } }
+            }
+          }
+        });
+
+        // 4. Breakdown by Instrument & Direction
+        const instMap = new Map();
+        trades.forEach((t) => {
+          const sym = t.symbol || 'OTRO';
+          if (!instMap.has(sym)) instMap.set(sym, { long: 0, short: 0, count: 0, wins: 0, net: 0 });
+          const entry = instMap.get(sym);
+          const pnl = Number(t.pnl) || 0;
+          if (t.side === 'Long') entry.long += pnl;
+          else entry.short += pnl;
+          entry.count++;
+          if (pnl > 0) entry.wins++;
+          entry.net += pnl;
+        });
+        const instLabels = Array.from(instMap.keys());
+
+        upsertChart('chart-instrument', {
+          type: 'bar',
+          data: {
+            labels: instLabels,
+            datasets: [
+              {
+                label: 'Long ($)',
+                data: instLabels.map(k => instMap.get(k).long),
+                backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                borderRadius: 6,
+              },
+              {
+                label: 'Short ($)',
+                data: instLabels.map(k => instMap.get(k).short),
+                backgroundColor: 'rgba(56, 189, 248, 0.8)',
+                borderRadius: 6,
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: '#cbd5e1', font: { size: 11 } } },
+              tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmtUSD(ctx.parsed.y)}` } }
+            },
+            scales: {
+              x: { grid: commonGrid, ticks: commonTicks },
+              y: { grid: commonGrid, ticks: { ...commonTicks, callback: (v) => `$${v}` } }
+            }
+          }
+        });
+
+        document.getElementById('instrument-badges').innerHTML = instLabels.map((sym) => {
+          const item = instMap.get(sym);
+          const wr = item.count ? (item.wins / item.count) * 100 : 0;
+          const colorCls = item.net >= 0 ? 'text-emerald-400' : 'text-rose-400';
+          return `
+            <span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 tabular-nums">
+              <strong class="text-white">${sym}</strong> · ${item.count}t · WR ${fmtNum(wr, 0)}% ·
+              <span class="${colorCls} font-semibold">${fmtUSD(item.net)}</span>
+            </span>
+          `;
+        }).join('');
+
+        // 5. MAE vs MFE Scatter
+        const winPts = trades.filter(t => t.pnl >= 0).map((t, i) => ({ x: t.mae, y: t.mfe, trade: t }));
+        const lossPts = trades.filter(t => t.pnl < 0).map((t, i) => ({ x: t.mae, y: t.mfe, trade: t }));
+
+        upsertChart('chart-mae-mfe', {
+          type: 'scatter',
+          data: {
+            datasets: [
+              {
+                label: 'Ganadores',
+                data: winPts,
+                backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                pointRadius: 6,
+                pointHoverRadius: 8,
+              },
+              {
+                label: 'Perdedores',
+                data: lossPts,
+                backgroundColor: 'rgba(244, 63, 94, 0.85)',
+                pointRadius: 6,
+                pointHoverRadius: 8,
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: '#cbd5e1', font: { size: 11 } } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const tr = ctx.raw.trade;
+                    return `${tr.symbol} (${tr.side}) | MAE: ${fmtNum(tr.mae)} | MFE: ${fmtNum(tr.mfe)} | ${fmtUSD(tr.pnl)}`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { title: { display: true, text: 'MAE (puntos adversos)', color: '#94a3b8' }, grid: commonGrid, ticks: commonTicks },
+              y: { title: { display: true, text: 'MFE (puntos favorables)', color: '#94a3b8' }, grid: commonGrid, ticks: commonTicks },
+            }
+          }
+        });
+
+        // 6. Trade PnL Distribution
+        upsertChart('chart-trade-pnl', {
+          type: 'bar',
+          data: {
+            labels: trades.map((t, i) => `#${i + 1} ${t.symbol}`),
+            datasets: [{
+              label: 'PnL ($)',
+              data: trades.map(t => t.pnl),
+              backgroundColor: trades.map(t => (t.pnl >= 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(244, 63, 94, 0.8)')),
+              borderRadius: 6,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => `PnL: ${fmtUSD(ctx.parsed.y)}` } }
+            },
+            scales: {
+              x: { grid: commonGrid, ticks: commonTicks },
+              y: { grid: commonGrid, ticks: { ...commonTicks, callback: (v) => `$${v}` } }
+            }
+          }
+        });
+
+        // 7. PnL by Entry Hour
+        const hourMap = new Map();
+        trades.forEach((t) => {
+          const h = (t.entryTime || '').slice(11, 13);
+          if (!h) return;
+          const label = `${h}:00`;
+          hourMap.set(label, (hourMap.get(label) || 0) + (Number(t.pnl) || 0));
+        });
+        const sortedHours = Array.from(hourMap.keys()).sort();
+        const hourVals = sortedHours.map(h => hourMap.get(h));
+
+        upsertChart('chart-hour', {
+          type: 'bar',
+          data: {
+            labels: sortedHours,
+            datasets: [{
+              label: 'PnL ($)',
+              data: hourVals,
+              backgroundColor: hourVals.map(v => (v >= 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(244, 63, 94, 0.8)')),
+              borderRadius: 6,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => `PnL: ${fmtUSD(ctx.parsed.y)}` } }
+            },
+            scales: {
+              x: { grid: commonGrid, ticks: commonTicks },
+              y: { grid: commonGrid, ticks: { ...commonTicks, callback: (v) => `$${v}` } }
+            }
+          }
+        });
+
+        // 8. PnL by Weekday
+        const weekdayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+        const wdTotals = [0, 0, 0, 0, 0, 0, 0];
+        trades.forEach((t) => {
+          const dStr = (t.entryTime || '').slice(0, 10);
+          if (!dStr) return;
+          const jsDay = new Date(`${dStr}T00:00:00`).getDay();
+          const idx = jsDay === 0 ? 6 : jsDay - 1;
+          wdTotals[idx] += Number(t.pnl) || 0;
+        });
+
+        upsertChart('chart-weekday', {
+          type: 'bar',
+          data: {
+            labels: weekdayNames,
+            datasets: [{
+              label: 'PnL ($)',
+              data: wdTotals,
+              backgroundColor: wdTotals.map(v => (v >= 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(244, 63, 94, 0.8)')),
+              borderRadius: 6,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => `PnL: ${fmtUSD(ctx.parsed.y)}` } }
+            },
+            scales: {
+              x: { grid: commonGrid, ticks: commonTicks },
+              y: { grid: commonGrid, ticks: { ...commonTicks, callback: (v) => `$${v}` } }
+            }
+          }
+        });
+      }
+
+      function renderCalendar(trades) {
+        if (state.calYear === null || state.calMonth === null) {
+          const refDate = trades.length
+            ? new Date(`${trades[trades.length - 1].exitTime.slice(0, 10)}T00:00:00`)
+            : new Date();
+          state.calYear = refDate.getFullYear();
+          state.calMonth = refDate.getMonth();
+        }
+
+        const year = state.calYear;
+        const month = state.calMonth;
+        const monthLabel = new Date(year, month, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+        document.getElementById('cal-month-title').textContent = monthLabel;
+
+        const dayMap = new Map();
+        trades.forEach((t) => {
+          const d = (t.exitTime || '').slice(0, 10);
+          if (!d) return;
+          if (!dayMap.has(d)) dayMap.set(d, { pnl: 0, count: 0 });
+          const obj = dayMap.get(d);
+          obj.pnl += Number(t.pnl) || 0;
+          obj.count++;
+        });
+
+        const firstDay = new Date(year, month, 1);
+        const startOffset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        let monthNet = 0;
+        let greenDays = 0;
+        let redDays = 0;
+        let cellsHtml = '';
+
+        for (let i = 0; i < startOffset; i++) {
+          cellsHtml += `<div class="min-h-[68px] rounded-xl bg-slate-900/25 border border-slate-800/30"></div>`;
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const info = dayMap.get(key);
+          if (info) {
+            monthNet += info.pnl;
+            if (info.pnl > 0) greenDays++;
+            else if (info.pnl < 0) redDays++;
+          }
+          let boxCls = 'bg-slate-900/60 border-slate-800/80 text-slate-400';
+          let pnlHtml = '<span class="text-[10px] text-slate-600">-</span>';
+          if (info) {
+            if (info.pnl > 0) {
+              boxCls = 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200';
+              pnlHtml = `<span class="text-xs font-bold text-emerald-400 tabular-nums">${fmtUSD(info.pnl)}</span>
+                         <span class="text-[10px] text-emerald-300/80">${info.count}t</span>`;
+            } else if (info.pnl < 0) {
+              boxCls = 'bg-rose-500/15 border-rose-500/40 text-rose-200';
+              pnlHtml = `<span class="text-xs font-bold text-rose-400 tabular-nums">${fmtUSD(info.pnl)}</span>
+                         <span class="text-[10px] text-rose-300/80">${info.count}t</span>`;
+            } else {
+              boxCls = 'bg-slate-800/60 border-slate-700 text-slate-200';
+              pnlHtml = `<span class="text-xs font-bold tabular-nums">$0,00</span><span class="text-[10px]">${info.count}t</span>`;
+            }
+          }
+
+          cellsHtml += `
+            <div class="min-h-[68px] rounded-xl border p-1.5 flex flex-col justify-between ${boxCls}">
+              <span class="text-[11px] font-semibold self-end opacity-80">${day}</span>
+              <div class="flex flex-col leading-tight">${pnlHtml}</div>
+            </div>
+          `;
+        }
+
+        document.getElementById('calendar-grid').innerHTML = cellsHtml;
+        document.getElementById('calendar-summary').innerHTML = `
+          PnL del mes: <strong class="${monthNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${fmtUSD(monthNet)}</strong>
+          · Días verdes: <strong class="text-emerald-400">${greenDays}</strong>
+          · Días rojos: <strong class="text-rose-400">${redDays}</strong>
+        `;
+      }
+
+      function getTableRows(trades) {
+        let runningEq = 0;
+        const enriched = trades.map((t, idx) => {
+          runningEq += Number(t.pnl) || 0;
+          return { ...t, seqId: idx + 1, equity: runningEq };
+        });
+
+        const q = state.search.trim().toLowerCase();
+        const searched = q
+          ? enriched.filter((t) =>
+              `${t.instrument} ${t.side} ${t.entryName} ${t.exitName} ${t.entryTime} ${t.exitTime}`
+                .toLowerCase()
+                .includes(q)
+            )
+          : enriched;
+
+        const dir = state.sortDir === 'asc' ? 1 : -1;
+        const key = state.sortKey === 'id' ? 'seqId' : state.sortKey;
+
+        return searched.sort((a, b) => {
+          const va = a[key];
+          const vb = b[key];
+          if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+          return String(va ?? '').localeCompare(String(vb ?? '')) * dir;
+        });
+      }
+
+      function renderTable(trades) {
+        const rows = getTableRows(trades);
+        const tbody = document.getElementById('trades-tbody');
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="15" class="px-4 py-8 text-center text-slate-400">No hay operaciones que coincidan con los filtros actuales.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = rows.map((t) => {
+          const sideBadge = t.side === 'Long'
+            ? '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Long</span>'
+            : '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">Short</span>';
+          const pnlCls = t.pnl >= 0 ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+          const ptsCls = t.pnlPoints >= 0 ? 'text-emerald-300' : 'text-rose-300';
+
+          return `
+            <tr class="hover:bg-slate-900/70 transition-colors">
+              <td class="px-3 py-2.5 text-slate-400">${t.seqId}</td>
+              <td class="px-3 py-2.5 font-medium text-white whitespace-nowrap">${escapeHtml(t.instrument)}</td>
+              <td class="px-3 py-2.5">${sideBadge}</td>
+              <td class="px-3 py-2.5 text-right text-slate-300">${t.qty}</td>
+              <td class="px-3 py-2.5 text-slate-300 whitespace-nowrap">${fmtDateTime(t.entryTime)}</td>
+              <td class="px-3 py-2.5 text-slate-300 whitespace-nowrap">${fmtDateTime(t.exitTime)}</td>
+              <td class="px-3 py-2.5 text-right text-slate-300 whitespace-nowrap">${fmtDuration(t.durationMin)}</td>
+              <td class="px-3 py-2.5 text-right text-slate-300">${fmtNum(t.entryPrice, 2)}</td>
+              <td class="px-3 py-2.5 text-right text-slate-300">${fmtNum(t.exitPrice, 2)}</td>
+              <td class="px-3 py-2.5 text-right whitespace-nowrap ${ptsCls}">${fmtNum(t.pnlPoints, 2)}</td>
+              <td class="px-3 py-2.5 text-right text-slate-400">${fmtNum(t.mae, 2)}</td>
+              <td class="px-3 py-2.5 text-right text-slate-400">${fmtNum(t.mfe, 2)}</td>
+              <td class="px-3 py-2.5 text-right whitespace-nowrap ${pnlCls}">${fmtUSD(t.pnl)}</td>
+              <td class="px-3 py-2.5 text-right whitespace-nowrap text-sky-300">${fmtUSD(t.equity)}</td>
+              <td class="px-3 py-2.5 text-slate-300 whitespace-nowrap">${escapeHtml(t.entryName)} &rarr; ${escapeHtml(t.exitName)}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      function populateFilterOptions() {
+        const symbols = Array.from(new Set(allTrades.map(t => t.symbol).filter(Boolean))).sort();
+        const strategies = Array.from(new Set(allTrades.map(t => t.entryName).filter(Boolean))).sort();
+
+        const symSel = document.getElementById('filter-symbol');
+        symbols.forEach((s) => {
+          const opt = document.createElement('option');
+          opt.value = s;
+          opt.textContent = s;
+          symSel.appendChild(opt);
+        });
+
+        const stratSel = document.getElementById('filter-strategy');
+        strategies.forEach((st) => {
+          const opt = document.createElement('option');
+          opt.value = st;
+          opt.textContent = st;
+          stratSel.appendChild(opt);
+        });
+      }
+
+      function renderAll() {
+        const filtered = getFilteredTrades();
+        const stats = computeStats(filtered);
+        renderHeaderAndFiltersMeta(filtered, stats);
+        renderKPIs(stats);
+        renderCharts(filtered, stats);
+        renderAdvancedStats(stats);
+        renderCalendar(filtered);
+        renderTable(filtered);
+      }
+
+      // Wire events
+      document.getElementById('filter-symbol').addEventListener('change', (e) => { state.symbol = e.target.value; renderAll(); });
+      document.getElementById('filter-side').addEventListener('change', (e) => { state.side = e.target.value; renderAll(); });
+      document.getElementById('filter-strategy').addEventListener('change', (e) => { state.strategy = e.target.value; renderAll(); });
+      document.getElementById('filter-from').addEventListener('change', (e) => { state.fromDate = e.target.value; renderAll(); });
+      document.getElementById('filter-to').addEventListener('change', (e) => { state.toDate = e.target.value; renderAll(); });
+      document.getElementById('table-search').addEventListener('input', (e) => { state.search = e.target.value; renderTable(getFilteredTrades()); });
+
+      document.getElementById('btn-reset-filters').addEventListener('click', () => {
+        state.symbol = 'ALL';
+        state.side = 'ALL';
+        state.strategy = 'ALL';
+        state.fromDate = '';
+        state.toDate = '';
+        state.search = '';
+        document.getElementById('filter-symbol').value = 'ALL';
+        document.getElementById('filter-side').value = 'ALL';
+        document.getElementById('filter-strategy').value = 'ALL';
+        document.getElementById('filter-from').value = '';
+        document.getElementById('filter-to').value = '';
+        document.getElementById('table-search').value = '';
+        renderAll();
+      });
+
+      document.querySelectorAll('.eq-unit-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.eqUnit = btn.dataset.eqUnit;
+          document.querySelectorAll('.eq-unit-btn').forEach(b => {
+            b.className = b === btn
+              ? 'eq-unit-btn px-2.5 py-1 rounded-md font-medium bg-sky-500/20 text-sky-300'
+              : 'eq-unit-btn px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-slate-200';
+          });
+          const filtered = getFilteredTrades();
+          renderCharts(filtered, computeStats(filtered));
+        });
+      });
+
+      document.querySelectorAll('.eq-x-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.eqX = btn.dataset.eqX;
+          document.querySelectorAll('.eq-x-btn').forEach(b => {
+            b.className = b === btn
+              ? 'eq-x-btn px-2.5 py-1 rounded-md font-medium bg-sky-500/20 text-sky-300'
+              : 'eq-x-btn px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-slate-200';
+          });
+          const filtered = getFilteredTrades();
+          renderCharts(filtered, computeStats(filtered));
+        });
+      });
+
+      document.querySelectorAll('.period-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.period = btn.dataset.period;
+          document.querySelectorAll('.period-btn').forEach(b => {
+            b.className = b === btn
+              ? 'period-btn px-2.5 py-1 rounded-md font-medium bg-sky-500/20 text-sky-300'
+              : 'period-btn px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-slate-200';
+          });
+          const filtered = getFilteredTrades();
+          renderCharts(filtered, computeStats(filtered));
+        });
+      });
+
+      document.getElementById('cal-prev').addEventListener('click', () => {
+        state.calMonth--;
+        if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
+        renderCalendar(getFilteredTrades());
+      });
+      document.getElementById('cal-next').addEventListener('click', () => {
+        state.calMonth++;
+        if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
+        renderCalendar(getFilteredTrades());
+      });
+
+      document.querySelectorAll('.sort-btn').forEach((th) => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.sort;
+          if (state.sortKey === key) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+          else { state.sortKey = key; state.sortDir = 'desc'; }
+          renderTable(getFilteredTrades());
+        });
+      });
+
+      document.getElementById('btn-export-csv').addEventListener('click', () => {
+        const rows = getTableRows(getFilteredTrades());
+        const headers = ['ID', 'Instrumento', 'Simbolo', 'Lado', 'Qty', 'Entrada', 'Salida', 'DuracionMin', 'PrecioEntrada', 'PrecioSalida', 'Puntos', 'MAE', 'MFE', 'PnL_USD', 'Equity_USD', 'SenalEntrada', 'SenalSalida'];
+        const csvLines = [headers.join(',')];
+        rows.forEach((t) => {
+          const vals = [
+            t.seqId, t.instrument, t.symbol, t.side, t.qty,
+            t.entryTime, t.exitTime, t.durationMin, t.entryPrice, t.exitPrice,
+            t.pnlPoints, t.mae, t.mfe, t.pnl, t.equity.toFixed(2),
+            `"${String(t.entryName).replace(/"/g, '""')}"`,
+            `"${String(t.exitName).replace(/"/g, '""')}"`,
+          ];
+          csvLines.push(vals.join(','));
+        });
+        const blob = new Blob(['\uFEFF' + csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `trading_trades_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+      });
+
+      populateFilterOptions();
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
