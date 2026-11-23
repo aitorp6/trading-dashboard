@@ -3,7 +3,7 @@
   "accountLabel": "Cuenta Real",
   "accountType": "Real",
   "fromDate": "2026-01-01",
-  "generatedAt": "2026-11-22 19:51:08",
+  "generatedAt": "2026-11-23 19:28:43",
   "source": "db",
   "warnings": [],
   "trades": [
@@ -930,6 +930,48 @@
       "commission": 0.0,
       "fee": 0.0,
       "id": 44
+    },
+    {
+      "instrument": "NNQ DEC26",
+      "symbol": "NNQ",
+      "side": "Long",
+      "qty": 1,
+      "entryName": "Long_TP1",
+      "exitName": "Profit target",
+      "entryTime": "2026-11-23T09:00:00",
+      "exitTime": "2026-11-23T09:03:00",
+      "durationMin": 3.0,
+      "entryPrice": 26690.0,
+      "exitPrice": 26829.5,
+      "pnl": 27.9,
+      "pnlPoints": 139.5,
+      "mae": 120.0,
+      "mfe": 188.5,
+      "bars": 0,
+      "commission": 0.0,
+      "fee": 0.0,
+      "id": 45
+    },
+    {
+      "instrument": "NNQ DEC26",
+      "symbol": "NNQ",
+      "side": "Long",
+      "qty": 1,
+      "entryName": "Long_Runner",
+      "exitName": "Stop loss",
+      "entryTime": "2026-11-23T09:00:00",
+      "exitTime": "2026-11-23T09:09:58",
+      "durationMin": 9.97,
+      "entryPrice": 26690.0,
+      "exitPrice": 26688.5,
+      "pnl": -0.3,
+      "pnlPoints": -1.5,
+      "mae": 120.0,
+      "mfe": 188.5,
+      "bars": 0,
+      "commission": 0.0,
+      "fee": 0.0,
+      "id": 46
     }
   ]
 }
